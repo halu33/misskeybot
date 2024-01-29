@@ -1,3 +1,6 @@
+import asyncio
+import json
+import websockets
 import os
 import time
 import datetime
@@ -11,13 +14,42 @@ load_dotenv()
 
 #初期化
 api = Misskey('misskey.io')
+TOKEN = os.getenv('TOKEN')
 api.token = os.getenv('TOKEN')
+WS_URL = 'wss://misskey.io/streaming?i=' + TOKEN
 
 #ノート
 #api.notes_create(text='Hello World') #test用
 
 #message.csv読み込み
 df = pd.read_csv("message.csv", header=None)
+
+#通知受け取り
+async def runner():
+    try:
+        async with websockets.connect(WS_URL) as ws:
+            await ws.send(json.dumps({
+                "type": "connect",
+                "body": {
+                    "channel": "main",
+                    "id": "test"
+                }
+            }))
+
+            while True:
+                data = json.loads(await ws.recv())
+                if data['type'] == 'channel' and data['body']['type'] == 'notification':
+                    notification = data['body']['body']
+
+                    if notification['type'] == 'mention':
+                        mention_note = notification['note']
+                        random_message = df.iloc[random.randint(0, len(df) - 1), 1]
+                        api.notes_create(text=random_message, replyId=mention_note['id'])
+
+    except websockets.ConnectionClosedError as e:
+        print(f"WebSocket接続が切断されました: {e}")
+
+asyncio.run(runner())
 
 #同じ内容の投稿を連続で行わないための変数
 x = 100000
