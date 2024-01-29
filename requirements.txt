@@ -1,3 +1,4 @@
 pandas
-Misskey.py
+misskey.py
 python-dotenv
+websockets
